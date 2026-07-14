@@ -18,6 +18,8 @@ set (63,978 comments):
 | Toxic precision | 0.48 |
 | Toxic F1 | 0.61 |
 
+![Training and validation loss/accuracy curves](models/saved_models/training_curves.png)
+
 Precision is intentionally traded off for recall (via class weighting and a
 validation-F1-tuned decision threshold): for comment moderation, missing
 toxic content is usually worse than over-flagging borderline content.
