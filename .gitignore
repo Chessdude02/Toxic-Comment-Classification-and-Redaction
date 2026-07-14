@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Trained model artifacts (regenerate with models/training/fix_overfitted_model.py)
+models/saved_models/*.keras
+models/saved_models/*.h5
+models/saved_models/*.pickle
+
+# Raw Kaggle competition data - redistribution isn't permitted by the
+# competition rules, so it's never checked in. Place train.csv here
+# (or point JIGSAW_TRAIN_CSV at it) to train on real data locally.
+models/data/
+*.csv
+!models/**/*.example.csv

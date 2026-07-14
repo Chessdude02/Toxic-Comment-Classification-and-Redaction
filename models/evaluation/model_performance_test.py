@@ -10,17 +10,25 @@ This script tests your trained model against various inputs to evaluate:
 4. Bias and fairness issues
 """
 
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import numpy as np
 import pandas as pd
 import pickle
 import tensorflow as tf
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing import sequence
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import seaborn as sns
 from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score
 import warnings
 warnings.filterwarnings('ignore')
+
+from common.paths import MODEL_PATH, TOKENIZER_PATH, CONFIG_PATH
 
 class ModelTester:
     """
@@ -37,18 +45,18 @@ class ModelTester:
         """Load model, tokenizer, and configuration"""
         try:
             print("🔄 Loading model artifacts...")
-            
+
             # Load model
-            self.model = load_model("saved_models/demo_toxicity_classifier.h5")
+            self.model = load_model(MODEL_PATH)
             print("✅ Model loaded successfully")
-            
+
             # Load tokenizer
-            with open("tokenizer.pickle", "rb") as f:
+            with open(TOKENIZER_PATH, "rb") as f:
                 self.tokenizer = pickle.load(f)
             print("✅ Tokenizer loaded successfully")
-            
+
             # Load config
-            with open("saved_models/config.pickle", "rb") as f:
+            with open(CONFIG_PATH, "rb") as f:
                 self.config = pickle.load(f)
             print("✅ Configuration loaded successfully")
             
@@ -79,6 +87,9 @@ class ModelTester:
     
     def predict_toxicity(self, text):
         """Predict toxicity for a single text"""
+        if pd.isna(text) or not str(text).strip():
+            return {"toxic": 0.0}
+
         processed = self.preprocess_text(text)
         prediction = self.model.predict(processed, verbose=0)[0]
         
