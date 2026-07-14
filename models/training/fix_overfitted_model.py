@@ -21,10 +21,11 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pickle
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import precision_recall_curve, f1_score
 from tensorflow.keras.preprocessing import sequence, text
 import warnings
 
-from common.data import load_dataset
+from common.data import load_dataset, debias_context_traps
 from common.model import build_model, get_callbacks, class_weights
 from common.paths import MODEL_PATH, TOKENIZER_PATH, CONFIG_PATH, TRAINING_CURVES_PATH, ARTIFACTS_DIR
 
@@ -148,7 +149,7 @@ def analyze_training_results(history):
     return not overfitting
 
 
-def test_fixed_model(model, tokenizer, max_len):
+def test_fixed_model(model, tokenizer, max_len, threshold=0.5):
     print("\nTESTING FIXED MODEL")
     print("=" * 40)
 
@@ -176,7 +177,7 @@ def test_fixed_model(model, tokenizer, max_len):
     correct = 0
     for txt, expected_toxic, description in test_cases:
         prob = predict_text(txt)
-        predicted_toxic = prob > 0.5
+        predicted_toxic = prob > threshold
         is_correct = predicted_toxic == expected_toxic
         correct += is_correct
         status = "PASS" if is_correct else "FAIL"
@@ -216,6 +217,7 @@ def main():
             frac = REAL_SAMPLE_CAP / len(df)
             parts = [group.sample(frac=frac, random_state=42) for _, group in df.groupby("toxic")]
             df = pd.concat(parts).sample(frac=1, random_state=42).reset_index(drop=True)
+        df = debias_context_traps(df)
     else:
         max_vocab, max_len, batch_size = SYNTHETIC_MAX_VOCAB, SYNTHETIC_MAX_LEN, 32
 
@@ -226,12 +228,23 @@ def main():
     model, history = train_model(X_train, X_val, y_train, y_val, vocab_size, max_len, batch_size=batch_size)
 
     training_ok = analyze_training_results(history)
-    test_ok = test_fixed_model(model, tokenizer, max_len)
+
+    # Pick the decision threshold that maximizes F1 on the validation set,
+    # instead of assuming 0.5 is right for an imbalanced dataset (~10% toxic).
+    val_probs = model.predict(X_val, verbose=0).ravel()
+    precisions, recalls, thresholds = precision_recall_curve(y_val, val_probs)
+    f1s = 2 * precisions * recalls / np.clip(precisions + recalls, 1e-9, None)
+    best_idx = int(np.argmax(f1s[:-1])) if len(thresholds) else 0
+    threshold = float(thresholds[best_idx]) if len(thresholds) else 0.5
+    print(f"\nBest validation-F1 threshold: {threshold:.3f} "
+          f"(F1={f1s[best_idx]:.3f} vs {f1_score(y_val, val_probs > 0.5):.3f} at 0.5)")
+
+    test_ok = test_fixed_model(model, tokenizer, max_len, threshold=threshold)
 
     config = {
         "vocab_size": vocab_size,
         "max_len": max_len,
-        "threshold": 0.5,
+        "threshold": threshold,
         "label_columns": ["toxic"],
         "dataset_source": source,
     }

@@ -262,3 +262,26 @@ def load_dataset(csv_path=None, seed=42):
     df = build_synthetic_dataset(seed=seed)
     print(f"No real dataset found in {search_paths}; using synthetic dataset: {len(df)} samples")
     return df, "synthetic"
+
+
+def debias_context_traps(df, repeats=40):
+    """
+    Lightly oversample non-toxic uses of common toxicity-flag words
+    ("kill", "hate", ...) into a real dataset.
+
+    Jigsaw's Wikipedia-talk-page comments are heavily skewed toward
+    literal, targeted toxicity - casual/idiomatic uses of words like "kill"
+    ("you killed it out there") or "hate" ("I hate waiting in line") are
+    rare in that corpus. A model trained on it picks up a strong keyword
+    correlation and misfires on exactly those idiomatic cases. This is a
+    documented class of bias in Jigsaw-trained toxicity models (it's the
+    subject of the follow-up "Jigsaw Unintended Bias" Kaggle competition);
+    oversampling a handful of contrastive examples is a standard, cheap
+    mitigation - it doesn't fix the underlying corpus, but it pulls the
+    decision boundary back toward using more than a single trigger word.
+    """
+    traps = pd.DataFrame({
+        "comment_text": CLEAN_CONTEXT_TRAPS * repeats,
+        "toxic": 0,
+    })
+    return pd.concat([df, traps], ignore_index=True).sample(frac=1, random_state=42).reset_index(drop=True)
