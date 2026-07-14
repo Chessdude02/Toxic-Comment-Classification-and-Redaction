@@ -7,9 +7,16 @@ Simple utility to use your newly fixed toxicity classification model.
 """
 
 import pickle
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import tensorflow as tf
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing import sequence
+
+from common.paths import MODEL_PATH, TOKENIZER_PATH, CONFIG_PATH
 
 class ToxicityClassifier:
     """
@@ -26,13 +33,13 @@ class ToxicityClassifier:
         """Load the fixed model artifacts"""
         try:
             print("🔄 Loading fixed toxicity model...")
-            
-            self.model = load_model("saved_models/fixed_toxicity_model_final.h5")
-            
-            with open("fixed_toxicity_model_tokenizer.pickle", "rb") as f:
+
+            self.model = load_model(MODEL_PATH)
+
+            with open(TOKENIZER_PATH, "rb") as f:
                 self.tokenizer = pickle.load(f)
-            
-            with open("saved_models/fixed_toxicity_model_config.pickle", "rb") as f:
+
+            with open(CONFIG_PATH, "rb") as f:
                 self.config = pickle.load(f)
             
             print(f"✅ Model loaded successfully!")
@@ -55,12 +62,26 @@ class ToxicityClassifier:
         """
         if self.model is None:
             return {"error": "Model not loaded"}
-        
+
         # Preprocess text
         text_clean = str(text).lower().strip()
+
+        # Empty/near-empty input has no real content to classify. Without
+        # this guard, an all-padding sequence gets pushed through the
+        # embedding/LSTM stack anyway and the model happily returns a
+        # confident (and meaningless) prediction for it.
+        if not text_clean:
+            return {
+                "text": text,
+                "probability": 0.0,
+                "is_toxic": False,
+                "confidence": "Very Low",
+                "classification": "CLEAN",
+            }
+
         seq = self.tokenizer.texts_to_sequences([text_clean])
         padded = sequence.pad_sequences(seq, maxlen=self.config['max_len'])
-        
+
         # Get prediction
         prob = float(self.model.predict(padded, verbose=0)[0][0])
         is_toxic = prob > self.config['threshold']
