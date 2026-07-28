@@ -743,6 +743,14 @@ def initialize_models():
     return False
 
 
+# Run at import time (not just under `if __name__ == '__main__'`) so a
+# production WSGI server (gunicorn toxicity_web_app:app) initializes the
+# model the same way `python toxicity_web_app.py` does - the __main__ guard
+# alone would never run under gunicorn, since it imports this module rather
+# than executing it as a script.
+_models_ready = initialize_models()
+
+
 @app.route('/')
 def index():
     """Main page with the web interface."""
@@ -1028,19 +1036,19 @@ def create_sample_data():
 if __name__ == '__main__':
     print("🚀 Starting Toxicity Detection Web Application")
     print("=" * 60)
-    
-    # Initialize models
-    model_loaded = initialize_models()
-    
-    if not model_loaded:
-        print("⚠️ Running without pre-trained models (mock mode)")
-        print("Train and save models using the notebook to enable full functionality")
-    else:
-        # Create sample data for demonstration
+
+    # Models were already initialized at import time (see _models_ready
+    # above) so gunicorn and `python toxicity_web_app.py` behave the same.
+    if redactor_mode == 'trained':
         create_sample_data()
-    
+    elif redactor_mode == 'heuristic':
+        print("⚠️ No trained model found - running on the rule-based heuristic fallback")
+        print("Train and save a model using the notebook for the trained classifier instead")
+    else:
+        print("❌ Neither a trained model nor the heuristic fallback could be initialized")
+
     print("\n🌐 Starting Flask server...")
-    print("📱 Open your browser and go to: http://localhost:5000")
+    print(f"📱 Open your browser and go to: http://localhost:{os.environ.get('PORT', 5000)}")
     print("\n🔗 Available API endpoints:")
     print("  POST /api/check-toxicity - Check message toxicity")
     print("  POST /api/moderate-message - Moderate a message")
@@ -1059,12 +1067,17 @@ if __name__ == '__main__':
     print("\n🛠️ Press Ctrl+C to stop the server")
     print("=" * 60)
     
-    # Run the Flask app
+    # Run the Flask app. Cloud platforms (Render, Railway, Fly.io, etc.)
+    # inject the port to bind via $PORT rather than a fixed value, and
+    # debug=True would expose Werkzeug's interactive debugger (arbitrary
+    # code execution) to the internet - never enable it outside local dev.
+    # For real deployments, prefer running via gunicorn (see Dockerfile)
+    # rather than this development server.
     try:
         app.run(
             host='0.0.0.0',
-            port=5000,
-            debug=True,
+            port=int(os.environ.get('PORT', 5000)),
+            debug=os.environ.get('FLASK_DEBUG', '').lower() in ('1', 'true'),
             use_reloader=False  # Disable reloader to prevent model reloading
         )
     except KeyboardInterrupt:

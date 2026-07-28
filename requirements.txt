@@ -35,5 +35,5 @@ kaggle>=1.5.0
 # Optional: GPU support
 # tensorflow-gpu>=2.12.0
 
-# Optional: Production deployment
-# gunicorn>=21.0.0
+# Production deployment (used by Dockerfile's CMD)
+gunicorn>=21.0.0

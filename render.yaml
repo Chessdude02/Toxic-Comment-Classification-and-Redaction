@@ -1,0 +1,23 @@
+# Render Blueprint for the Flask redaction web app.
+#
+# Usage: on render.com, "New +" -> "Blueprint" -> connect this repo/branch ->
+# Render reads this file and creates the service below automatically.
+#
+# Runs with NO trained model by default (none are checked into the repo -
+# see .gitignore) - the app falls back to the rule-based heuristic detector
+# automatically (src/heuristic_fallback.py) rather than failing, so the
+# deployed URL works immediately. To serve the trained classifier instead,
+# train it (see README.md) and set up a persistent disk or object storage
+# to provide /app/saved_models/{demo_toxicity_classifier.h5, config.pickle,
+# tokenizer.pickle} to the running container.
+services:
+  - type: web
+    name: toxic-comment-redaction
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"
