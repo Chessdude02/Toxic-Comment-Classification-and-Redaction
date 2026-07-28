@@ -40,6 +40,15 @@ except ImportError:
     print("❌ Could not import toxicity_redactor module. Make sure it's in the same directory.")
     sys.exit(1)
 
+# Rule-based fallback used when no trained model is available (e.g. a fresh
+# deployment with no weights yet) - not a trained model, see
+# src/heuristic_fallback.py and upgrade2/README.md.
+try:
+    from heuristic_fallback import HeuristicRedactor
+except ImportError as _e:
+    HeuristicRedactor = None
+    print(f"⚠️  Heuristic fallback unavailable ({_e}); will return 503 without a trained model.")
+
 # Initialize Flask app
 app = Flask(__name__)
 CORS(app)  # Enable CORS for API access
@@ -51,6 +60,9 @@ logger = logging.getLogger(__name__)
 # Global variables
 redactor = None
 chat_moderator = None
+# One of: 'trained' (real model loaded), 'heuristic' (rule-based fallback,
+# no trained model), 'unavailable' (neither could be initialized).
+redactor_mode = 'unavailable'
 
 # HTML template for the web interface
 HTML_TEMPLATE = """
@@ -522,7 +534,11 @@ HTML_TEMPLATE = """
             if (result.was_redacted) {
                 html += `<p><strong>Redaction Applied:</strong> ${result.redaction_style}</p>`;
             }
-            
+
+            if (result.mode === 'heuristic') {
+                html += `<p><em>Scored by the rule-based heuristic fallback, not a trained model.</em></p>`;
+            }
+
             html += '</div>';
             resultDiv.innerHTML = html;
         }
@@ -625,24 +641,29 @@ HTML_TEMPLATE = """
                 document.getElementById('toxicityRate').textContent =
                     ((stats.toxicity_rate || 0) * 100).toFixed(1) + '%';
 
-                updateModelStatusBanner(stats.model_loaded);
+                updateModelStatusBanner(stats.mode);
             } catch (error) {
                 console.error('Error updating stats:', error);
             }
         }
 
-        // Show whether a trained model is actually loaded, since the API
-        // still returns 200s with mock/lexicon-only behavior when it isn't.
-        function updateModelStatusBanner(modelLoaded) {
+        // Reflect which of three states is actually backing predictions,
+        // since the API returns 200s in both the trained and heuristic
+        // cases - only the banner (and each result's "mode" field) tells
+        // you which one you're looking at.
+        function updateModelStatusBanner(mode) {
             const banner = document.getElementById('modelStatusBanner');
-            banner.classList.remove('hidden');
-            if (modelLoaded) {
+            banner.classList.remove('hidden', 'ok');
+            if (mode === 'trained') {
                 banner.classList.add('ok');
                 banner.innerHTML = '✅ Trained model loaded — live predictions are active.';
+            } else if (mode === 'heuristic') {
+                banner.innerHTML = '⚠️ No trained model loaded — running on the rule-based heuristic ' +
+                    'fallback (upgrade2), not a trained model. Predictions are real but limited to ' +
+                    'keyword/pattern matching.';
             } else {
-                banner.classList.remove('ok');
-                banner.innerHTML = '⚠️ No trained model loaded — toxicity-check endpoints will return HTTP 503. ' +
-                    'Train a model first (see the root README) and restart this app.';
+                banner.innerHTML = '❌ No trained model or heuristic fallback available — ' +
+                    'toxicity-check endpoints will return HTTP 503.';
             }
         }
         
@@ -676,26 +697,50 @@ HTML_TEMPLATE = """
 
 
 def initialize_models():
-    """Initialize the toxicity detection models."""
-    global redactor, chat_moderator
-    
+    """Initialize the toxicity detection models.
+
+    Tries the trained model first. If none is available (no weights checked
+    in/mounted - the common case for a fresh deploy), falls back to the
+    rule-based heuristic detector instead of leaving the app unable to
+    respond to anything. Both paths implement the same
+    classify_toxicity()/redact_message() interface, so ChatModerator and
+    every API route below work unchanged either way.
+    """
+    global redactor, chat_moderator, redactor_mode
+
     try:
-        # Try to load pre-trained model
         redactor = load_pretrained_model()
-        
-        if redactor is None:
-            logger.warning("Could not load pre-trained model. Using mock responses.")
-            return False
-        
-        # Initialize chat moderator
-        chat_moderator = ChatModerator(redactor, auto_moderate=True)
-        
-        logger.info("✅ Models initialized successfully!")
-        return True
-        
+
+        if redactor is not None:
+            chat_moderator = ChatModerator(redactor, auto_moderate=True)
+            redactor_mode = 'trained'
+            logger.info("✅ Trained model loaded successfully!")
+            return True
+
+        logger.warning("Could not load a trained model.")
+
     except Exception as e:
-        logger.error(f"❌ Error initializing models: {str(e)}")
-        return False
+        logger.error(f"❌ Error loading trained model: {str(e)}")
+
+    if HeuristicRedactor is not None:
+        try:
+            redactor = HeuristicRedactor()
+            chat_moderator = ChatModerator(redactor, auto_moderate=True)
+            redactor_mode = 'heuristic'
+            logger.warning(
+                "⚠️  No trained model available - falling back to the rule-based "
+                "heuristic detector (upgrade2). This is NOT a trained model; see "
+                "upgrade2/README.md."
+            )
+            return True
+        except Exception as e:
+            logger.error(f"❌ Error initializing heuristic fallback: {str(e)}")
+
+    redactor = None
+    chat_moderator = None
+    redactor_mode = 'unavailable'
+    logger.error("❌ Neither a trained model nor the heuristic fallback could be initialized.")
+    return False
 
 
 @app.route('/')
@@ -744,6 +789,7 @@ def check_toxicity_api():
             'was_redacted': redaction_result['was_redacted'],
             'redaction_style': redaction_style,
             'detailed_results': classification['detailed_results'],
+            'mode': redactor_mode,
             'timestamp': datetime.now().isoformat()
         })
         
@@ -915,14 +961,18 @@ def get_stats_api():
                 'toxic_messages': 0,
                 'clean_messages': 0,
                 'toxicity_rate': 0,
-                'redacted_messages': 0
+                'redacted_messages': 0,
+                'mode': redactor_mode,
+                'model_loaded': redactor_mode == 'trained'
             })
-        
+
         stats = chat_moderator.get_moderation_stats()
         stats['clean_messages'] = stats['total_messages'] - stats['toxic_messages']
-        
+        stats['mode'] = redactor_mode
+        stats['model_loaded'] = redactor_mode == 'trained'
+
         return jsonify(stats)
-        
+
     except Exception as e:
         logger.error(f"Error in get_stats_api: {str(e)}")
         return jsonify({'error': str(e)}), 500
@@ -933,7 +983,8 @@ def health_check():
     """Health check endpoint."""
     return jsonify({
         'status': 'healthy',
-        'model_loaded': redactor is not None,
+        'mode': redactor_mode,
+        'model_loaded': redactor_mode == 'trained',
         'chat_moderator_loaded': chat_moderator is not None,
         'timestamp': datetime.now().isoformat()
     })

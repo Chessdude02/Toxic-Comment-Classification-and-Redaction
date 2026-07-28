@@ -219,7 +219,7 @@ python toxicity_web_app.py
 # Open http://localhost:5000
 ```
 
-Without a trained model in `saved_models/`, the app starts but toxicity-check endpoints return HTTP 503 rather than falling back to mock predictions — train via step 4 first for live results. The running app shows a banner indicating whether a model is actually loaded.
+Without a trained model in `saved_models/`, the app automatically falls back to a rule-based heuristic detector (`src/heuristic_fallback.py`, wrapping `upgrade2`'s keyword/pattern analyzer) instead of returning HTTP 503 — real, working predictions with no training required, clearly labeled as heuristic rather than a trained model. The running app shows a banner (and each API response includes a `mode` field: `trained` / `heuristic` / `unavailable`) so it's always clear which one is actually answering. Train via step 4 for the trained-model results described above.
 
 ### 6. (Alternative) Run the Web Application with Docker
 
