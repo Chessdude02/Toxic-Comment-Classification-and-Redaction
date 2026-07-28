@@ -34,4 +34,12 @@ WORKDIR /app/src
 # that server isn't designed for production traffic. Long --timeout because
 # the first request after a cold start pays for TensorFlow's import and
 # model loading. Shell form so $PORT expands at container start.
-CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT} --workers 2 --threads 2 --timeout 120 toxicity_web_app:app"]
+#
+# --workers 1: each gunicorn worker is a separate process that loads its own
+# full copy of TensorFlow + the model into memory. On a 512MB-RAM free-tier
+# instance (Render, Railway, etc.), 2 workers reliably triggers an OOM kill -
+# confirmed in practice ("Out of memory (used over 512Mi)"). --threads 4
+# gives request concurrency without duplicating that memory, since threads
+# share one process's memory. Override WEB_CONCURRENCY if you deploy
+# somewhere with more RAM and want real multi-process concurrency instead.
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT} --workers ${WEB_CONCURRENCY:-1} --threads 4 --timeout 120 toxicity_web_app:app"]

@@ -28,6 +28,18 @@ That's the entire manual process — one click after connecting the repo.
 **Free tier note**: Render's free instances spin down after inactivity and take ~30–60s to wake
 back up on the next request. That's expected, not a bug.
 
+**Memory note (confirmed the hard way)**: `toxicity_redactor.py` does `import tensorflow` at
+module level, which costs ~600MB of RSS on its own — more than a 512MB free-tier instance's entire
+budget, and it used to get imported unconditionally even when falling back to the heuristic
+detector. An early deploy of this repo hit exactly that: `Out of memory (used over 512Mi)`, twice,
+before ever serving a request. Fixed now — the app checks for trained model files on disk *before*
+importing anything from `toxicity_redactor.py`, and skips that import entirely if none are found
+(see `_trained_model_files_present()` in `toxicity_web_app.py`). Confirmed footprint: ~73MB RSS
+total in heuristic mode, ready in ~2 seconds, vs. ~630MB/~20s before the fix. If you do mount a
+real trained model (see below), expect memory usage to go back up substantially once TensorFlow
+loads for real — a free tier may not have enough headroom for that case, worth testing before
+relying on it.
+
 ## Option B: Railway (also free-tier friendly)
 
 1. Go to [railway.app](https://railway.app) → **New Project** → **Deploy from GitHub repo**.

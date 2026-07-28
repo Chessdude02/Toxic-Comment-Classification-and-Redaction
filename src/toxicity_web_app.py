@@ -33,21 +33,18 @@ from typing import Dict, List
 import os
 import sys
 
-# Import our toxicity redactor module
+# heuristic_fallback also provides ChatModerator (a copy of the one in
+# toxicity_redactor.py, deliberately NOT imported from there - see the
+# module docstring in heuristic_fallback.py: importing anything from
+# toxicity_redactor.py drags in `import tensorflow` at ~600MB RSS, which
+# alone is enough to OOM a 512MB deploy target before serving a request).
+# We only pay that cost if a trained model actually looks present on disk -
+# see initialize_models() below.
 try:
-    from toxicity_redactor import ToxicityRedactor, ChatModerator, load_pretrained_model, create_api_response
-except ImportError:
-    print("❌ Could not import toxicity_redactor module. Make sure it's in the same directory.")
-    sys.exit(1)
-
-# Rule-based fallback used when no trained model is available (e.g. a fresh
-# deployment with no weights yet) - not a trained model, see
-# src/heuristic_fallback.py and upgrade2/README.md.
-try:
-    from heuristic_fallback import HeuristicRedactor
+    from heuristic_fallback import HeuristicRedactor, ChatModerator
 except ImportError as _e:
-    HeuristicRedactor = None
-    print(f"⚠️  Heuristic fallback unavailable ({_e}); will return 503 without a trained model.")
+    print(f"❌ Could not import heuristic_fallback module ({_e}). Make sure it's in the same directory.")
+    sys.exit(1)
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -696,45 +693,62 @@ HTML_TEMPLATE = """
 """
 
 
+def _trained_model_files_present() -> bool:
+    """Cheap on-disk check, done BEFORE importing toxicity_redactor.
+
+    That module does `import tensorflow` at module level, which costs
+    ~600MB of RSS on its own - more than the entire memory budget on a
+    typical free-tier deploy (Render/Railway's 512MB, confirmed by an actual
+    OOM kill in practice). There is no point paying that cost if nobody has
+    actually provided a trained model to load.
+    """
+    return os.path.exists(os.path.join('saved_models', 'config.pickle'))
+
+
 def initialize_models():
     """Initialize the toxicity detection models.
 
-    Tries the trained model first. If none is available (no weights checked
-    in/mounted - the common case for a fresh deploy), falls back to the
-    rule-based heuristic detector instead of leaving the app unable to
-    respond to anything. Both paths implement the same
-    classify_toxicity()/redact_message() interface, so ChatModerator and
-    every API route below work unchanged either way.
+    Tries the trained model first, but only imports toxicity_redactor (and
+    therefore TensorFlow) if trained model files actually appear to be
+    present - see _trained_model_files_present(). Otherwise falls straight to
+    the rule-based heuristic detector, which needs neither TensorFlow nor a
+    trained model, instead of leaving the app unable to respond to anything.
+    Both paths implement the same classify_toxicity()/redact_message()
+    interface, so ChatModerator and every API route below work unchanged
+    either way.
     """
     global redactor, chat_moderator, redactor_mode
 
-    try:
-        redactor = load_pretrained_model()
-
-        if redactor is not None:
-            chat_moderator = ChatModerator(redactor, auto_moderate=True)
-            redactor_mode = 'trained'
-            logger.info("✅ Trained model loaded successfully!")
-            return True
-
-        logger.warning("Could not load a trained model.")
-
-    except Exception as e:
-        logger.error(f"❌ Error loading trained model: {str(e)}")
-
-    if HeuristicRedactor is not None:
+    if _trained_model_files_present():
         try:
-            redactor = HeuristicRedactor()
-            chat_moderator = ChatModerator(redactor, auto_moderate=True)
-            redactor_mode = 'heuristic'
-            logger.warning(
-                "⚠️  No trained model available - falling back to the rule-based "
-                "heuristic detector (upgrade2). This is NOT a trained model; see "
-                "upgrade2/README.md."
-            )
-            return True
+            from toxicity_redactor import load_pretrained_model
+            redactor = load_pretrained_model()
+
+            if redactor is not None:
+                chat_moderator = ChatModerator(redactor, auto_moderate=True)
+                redactor_mode = 'trained'
+                logger.info("✅ Trained model loaded successfully!")
+                return True
+
+            logger.warning("Trained model files were present but failed to load.")
+
         except Exception as e:
-            logger.error(f"❌ Error initializing heuristic fallback: {str(e)}")
+            logger.error(f"❌ Error loading trained model: {str(e)}")
+    else:
+        logger.info("No trained model files found - skipping the TensorFlow-heavy import entirely.")
+
+    try:
+        redactor = HeuristicRedactor()
+        chat_moderator = ChatModerator(redactor, auto_moderate=True)
+        redactor_mode = 'heuristic'
+        logger.warning(
+            "⚠️  No trained model available - falling back to the rule-based "
+            "heuristic detector (upgrade2). This is NOT a trained model; see "
+            "upgrade2/README.md."
+        )
+        return True
+    except Exception as e:
+        logger.error(f"❌ Error initializing heuristic fallback: {str(e)}")
 
     redactor = None
     chat_moderator = None
