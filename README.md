@@ -123,11 +123,14 @@ Input Text
 ├── RUN_INSTRUCTIONS.txt                              # Step-by-step execution guide
 ├── LICENSE                                           # MIT License
 ├── README.md                                         # This file
-├── Dockerfile / .dockerignore                        # Container image for the Flask web app
+├── Dockerfile / .dockerignore                        # Container image for the Flask web app (runs via gunicorn)
+├── render.yaml / railway.toml / Procfile             # One-click cloud deploy configs — see DEPLOYMENT.md
+├── DEPLOYMENT.md                                     # Step-by-step cloud deployment instructions
 ├── .github/workflows/ci.yml                          # CI: byte-compiles sources, smoke-tests heuristic/demo code
 │
 ├── src/                           # Redaction system (production-facing code)
 │   ├── toxicity_redactor.py       # Core redaction module — loads a trained model
+│   ├── heuristic_fallback.py      # Rule-based stand-in used when no trained model is available
 │   ├── toxicity_web_app.py        # Flask web application
 │   ├── redaction_api.py           # REST API endpoints
 │   ├── intelligent_redaction_system.py
@@ -229,7 +232,12 @@ docker run -p 5000:5000 -v "$(pwd)/saved_models:/app/saved_models" toxic-comment
 # Open http://localhost:5000
 ```
 
-The image installs `requirements.txt` and runs `src/toxicity_web_app.py`. Mount a `saved_models/` directory containing a trained model (from step 4) to get live predictions instead of HTTP 503 responses.
+The image runs via gunicorn (not the Flask dev server) and falls back to the heuristic detector with no trained model mounted, same as above.
+
+### 7. Deploy to the cloud
+
+See **[DEPLOYMENT.md](DEPLOYMENT.md)** for one-click steps on Render/Railway (`render.yaml` /
+`railway.toml` are both in the repo root) and a generic path for any Dockerfile-based host.
 
 ---
 

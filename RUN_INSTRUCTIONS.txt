@@ -111,6 +111,11 @@ PHASE 7 (OPTIONAL): RUN WITH DOCKER INSTEAD OF PHASE 4
      docker run -p 5000:5000 -v "$(pwd)/saved_models:/app/saved_models" toxic-comment-redaction
      # Open http://localhost:5000
 
+   For deploying this to an actual cloud host (Render, Railway, or any
+   Dockerfile-based platform) instead of running it locally, see
+   DEPLOYMENT.md — it works with zero manual config even without a trained
+   model, thanks to the heuristic fallback described in Phase 4.
+
 TROUBLESHOOTING
 ================
 
