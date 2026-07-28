@@ -13,6 +13,13 @@ logs/
 **/saved_models/*
 !**/saved_models/*.png
 !**/saved_models/.gitkeep
+# Real, trained-and-evaluated enhanced/ BiLSTM artifacts (~29MB total) -
+# shipped deliberately so the repo/demo work without a separate training
+# step. Root-layer weights (Transformer + GloVe) are NOT shipped - see
+# their own note in the root README.
+!enhanced/saved_models/toxicity_model.keras
+!enhanced/saved_models/tokenizer.pickle
+!enhanced/saved_models/config.pickle
 .env
 .ipynb_checkpoints/
 venv/

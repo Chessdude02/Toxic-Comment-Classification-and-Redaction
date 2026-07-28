@@ -341,6 +341,13 @@ Jigsaw's context-trap words, and real evaluation against the official held-out K
 Read [`enhanced/README.md`](enhanced/README.md) before assuming it's a drop-in upgrade to the root
 system — the two are independent and not meant to be run as one pipeline.
 
+Unlike this repo's other numbers, `enhanced/`'s **90.86% accuracy / 0.938 AUC** on the official
+63,978-row held-out Kaggle test set were reproduced end to end during this restructure (real
+training data, real Kaggle test labels, not carried over from an earlier claim) — see
+`enhanced/README.md`'s "Verified results" section for the full breakdown, including the trade-offs
+behind those numbers. The trained model (~29MB) is checked into `enhanced/saved_models/` so
+`enhanced/inference/` and `enhanced/redaction/` work immediately, no training step required.
+
 ---
 
 ## 📋 System Requirements

@@ -30,17 +30,38 @@ ships its own training/evaluation scripts rather than one notebook.
 - **A real generated chart.** `saved_models/training_curves.png` is an actual matplotlib output from
   a training run (loss/accuracy curves + the train/val loss gap), not a placeholder image.
 
-## What to verify yourself before quoting numbers
+## Verified results (real weights shipped)
 
-The reported results (~89.7% accuracy, AUC 0.945, trained on a 48,000-comment stratified sample of
-the real Jigsaw training set, evaluated on the 63,978 officially-labeled test rows) come from
-actually running `training/fix_overfitted_model.py` followed by `evaluation/evaluate_on_kaggle_test.py`
-against the real Kaggle files. No trained weights, the Jigsaw CSVs, or GloVe vectors are checked into
-this repo (see root `.gitignore`) — reproduce them yourself with the commands below rather than
-citing the numbers as a given. If you run training without a real Jigsaw CSV available, the scripts
-fall back to a small templated synthetic dataset (see `common/data.py`) purely so the pipeline still
-runs end-to-end — results from that fallback are not representative of real-world performance and
-should never be quoted as such.
+Unlike most of this repository's other performance claims, these numbers were reproduced end to
+end as part of this restructure — not carried over from an earlier, unverified pass. Training and
+evaluation were both run against the genuine Kaggle files (`train.csv`, `test.csv`,
+`test_labels.csv`), not the synthetic fallback:
+
+| Metric | Value |
+|---|---|
+| Training data | 48,480 real Jigsaw comments (stratified 60K sample of the 159,571-row training set, 80/20 train/val split) |
+| Architecture | BiLSTM (embedding 100d → SpatialDropout1D → Bidirectional LSTM(64) → Dense(32) → Dense(1)), 2,088,641 params |
+| Training | Early-stopped at epoch 19/40 (patience 6, monitor `val_loss`), best weights restored from epoch 13 |
+| Decision threshold | 0.838 (validation-F1-tuned, vs. F1 0.741 at a flat 0.5) |
+| **Held-out test accuracy** (official 63,978-row Kaggle test set) | **90.86%** |
+| **Held-out test AUC** | **0.9377** |
+| Toxic-class precision / recall / F1 | 0.51 / 0.79 / 0.62 |
+| Clean-class precision / recall / F1 | 0.98 / 0.92 / 0.95 |
+| Confusion matrix [TN, FP / FN, TP] | [53287, 4601 / 1249, 4841] |
+
+The trained model, tokenizer, and config (`saved_models/toxicity_model.keras`, `tokenizer.pickle`,
+`config.pickle`, ~29MB total) are checked into this repo specifically so `enhanced/inference/`
+and `enhanced/redaction/` work immediately without a training step — reproduce or retrain with the
+commands below if you want to verify this yourself or improve on it. As with any Jigsaw-trained
+toxicity model, precision on the toxic class (0.51) is modest relative to recall (0.79) — this
+reflects a real trade-off (see `common/data.py`'s debiasing docstring), not a bug: the decision
+threshold favors catching more toxic content at the cost of more false positives, which is a
+defensible choice for a moderation tool but worth knowing before quoting "90.86% accuracy" as the
+whole story.
+
+If you retrain without a real Jigsaw CSV available, the scripts fall back to a small templated
+synthetic dataset (see `common/data.py`) purely so the pipeline still runs end-to-end — results from
+that fallback are not representative of real-world performance and should never be quoted as such.
 
 ## Folder Structure
 
