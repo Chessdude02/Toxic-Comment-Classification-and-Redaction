@@ -1,0 +1,45 @@
+name: CI
+
+# Sanity CI only: syntax-checks every Python file and smoke-tests the parts
+# of this repo that run without a trained model, GloVe vectors, or the
+# Jigsaw dataset (none of which are checked into the repo — see .gitignore).
+# Full model training/evaluation is not run here; see the root README and
+# enhanced/README.md for how to reproduce those yourself.
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  sanity-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Byte-compile all Python sources
+        run: python -m compileall -q src upgrade2 models datasets tests enhanced
+
+      - name: Smoke-test heuristic components (no trained model required)
+        run: |
+          cd upgrade2/vocabulary && python enhanced_vocabulary_manager.py
+          cd ../semantic && python semantic_toxicity_analyzer.py
+          cd ../integration && python enhanced_toxicity_detector.py
+
+      - name: Smoke-test enhanced/ redaction module (lexicon-only fallback)
+        run: |
+          cd enhanced && python redaction/redact.py
+
+      - name: Dataset manager smoke test
+        run: |
+          cd datasets && python dataset_manager.py
