@@ -1,0 +1,39 @@
+# ============================================================
+# Toxic Comment Classification & Redaction System
+# Python Dependencies
+# ============================================================
+
+# Core
+numpy>=1.24.0
+pandas>=2.0.0
+scikit-learn>=1.3.0
+pyyaml>=6.0
+
+# Deep Learning
+tensorflow>=2.12.0
+
+# NLP / Text Processing
+regex>=2022.7.9
+
+# Visualization & Monitoring
+matplotlib>=3.7.0
+seaborn>=0.12.0
+plotly>=5.15.0
+tqdm>=4.65.0
+
+# Web Application & API
+flask>=2.3.0
+flask-cors>=4.0.0
+
+# Jupyter (for running the notebook)
+jupyter>=1.0.0
+ipykernel>=6.0.0
+
+# Dataset Download
+kaggle>=1.5.0
+
+# Optional: GPU support
+# tensorflow-gpu>=2.12.0
+
+# Optional: Production deployment
+# gunicorn>=21.0.0

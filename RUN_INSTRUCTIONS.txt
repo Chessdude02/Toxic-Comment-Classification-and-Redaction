@@ -1,0 +1,141 @@
+TOXIC COMMENT CLASSIFICATION SYSTEM - RUN INSTRUCTIONS
+========================================================
+
+This file gives exact, verified commands for running this repository's ROOT
+layer (Transformer classifier + Flask redaction system + upgrade2 heuristics).
+For the SEPARATE `enhanced/` layer (BiLSTM rebuild), see enhanced/README.md
+instead — its commands differ and are not covered here.
+
+PREREQUISITES
+=============
+- Python 3.8+ (3.10+ recommended)
+- 8GB+ RAM (16GB recommended for training)
+- pip install -r requirements.txt   (run once, from the repo root)
+
+PHASE 1: INSTALL & SANITY-CHECK
+================================
+
+1. Install dependencies (from the repo root):
+     pip install -r requirements.txt
+
+2. Verify key libraries installed:
+     python -c "import tensorflow; print(tensorflow.__version__)"
+     python -c "import pandas; print(pandas.__version__)"
+
+3. Generate + inspect the bundled sample dataset (20 rows, for smoke-testing
+   only — not representative of real performance):
+     cd datasets
+     python dataset_manager.py
+     cd ..
+
+PHASE 2: HEURISTIC LAYER SMOKE TEST (no trained model required)
+=================================================================
+
+These run immediately — they're rule-based (keyword/regex), not a trained
+model. See upgrade2/README.md for the full honest breakdown of what is/isn't
+ML here.
+
+     cd upgrade2/vocabulary  && python enhanced_vocabulary_manager.py && cd ../..
+     cd upgrade2/semantic    && python semantic_toxicity_analyzer.py && cd ../..
+     cd upgrade2/integration && python enhanced_toxicity_detector.py && cd ../..
+
+PHASE 3: TRAIN THE CLASSIFIER (this is the real model — 30-90+ min on CPU)
+============================================================================
+
+1. Download GloVe 840B 300D embeddings (~2GB):
+     wget https://nlp.stanford.edu/data/glove.840B.300d.zip
+     unzip glove.840B.300d.zip
+
+2. Download the Jigsaw dataset (requires a Kaggle account + API token —
+   see https://www.kaggle.com/docs/api):
+     pip install kaggle
+     kaggle competitions download -c jigsaw-toxic-comment-classification-challenge
+     unzip jigsaw-toxic-comment-classification-challenge.zip
+
+3. Open and run all cells in:
+     Industrial_Grade_Toxic_Comment_Classifier.ipynb
+   (Jupyter or Kaggle/Colab). This handles preprocessing, training,
+   evaluation, and saving the model + tokenizer.
+
+   Expected: training runs for up to 150 epochs with early stopping
+   (patience=15, monitors val_auc); the notebook reports final test
+   accuracy/AUC and a confusion matrix at the end.
+
+PHASE 4: LAUNCH THE WEB APPLICATION
+====================================
+
+     cd src
+     python toxicity_web_app.py
+     # Open http://localhost:5000
+
+   The page shows a status banner: "Trained model loaded" (green) once a
+   model is present, or a warning that toxicity-check endpoints will return
+   HTTP 503 otherwise. Without a trained model, the UI still loads — you
+   just won't get live predictions until Phase 3 is complete.
+
+   Try in the browser:
+     a) "Hello, how are you?"        -> expect CLEAN
+     b) "You're an idiot!"           -> expect TOXIC, with a confidence score
+     c) Try different redaction styles (warning/partial/complete/asterisk)
+     d) Use the chat simulation panel
+
+PHASE 5: TEST THE REDACTION MODULE DIRECTLY (no web server needed)
+=====================================================================
+
+     cd tests
+     python test_module.py
+     python test_redaction_system.py
+     cd ..
+
+   These import src/toxicity_redactor.py directly and print pass/fail
+   results for a set of sample messages. Without a trained model, they
+   report "Could not load model" and exit — this is expected, not a crash.
+
+PHASE 6: API TESTING (web app must still be running from Phase 4)
+=====================================================================
+
+     curl -X POST http://localhost:5000/api/check-toxicity \
+       -H "Content-Type: application/json" \
+       -d '{"message": "Hello world"}'
+
+     curl -X POST http://localhost:5000/api/moderate-batch \
+       -H "Content-Type: application/json" \
+       -d '{"messages": ["Nice job!", "You are stupid!"], "style": "warning"}'
+
+     curl http://localhost:5000/api/stats
+
+PHASE 7 (OPTIONAL): RUN WITH DOCKER INSTEAD OF PHASE 4
+=========================================================
+
+     docker build -t toxic-comment-redaction .
+     docker run -p 5000:5000 -v "$(pwd)/saved_models:/app/saved_models" toxic-comment-redaction
+     # Open http://localhost:5000
+
+TROUBLESHOOTING
+================
+
+"ModuleNotFoundError"
+  -> Re-run `pip install -r requirements.txt`; confirm you're in the repo
+     root when installing.
+
+Web app shows the "no trained model loaded" banner / API returns 503
+  -> Complete Phase 3 (training) first, and confirm files exist under
+     saved_models/ (demo_toxicity_classifier.h5, config.pickle,
+     tokenizer.pickle — see src/toxicity_redactor.py for exact filenames).
+
+Port 5000 already in use
+  -> Change the port in src/toxicity_web_app.py (the app.run(...) call at
+     the bottom of the file), or stop whatever else is using port 5000.
+
+Out of memory / slow training
+  -> Reduce batch_size in config.yaml, or train on a smaller subset of
+     train.csv first to confirm the pipeline works end to end.
+
+WHAT'S NEXT
+============
+
+- Full architecture, metrics, and API reference: README.md
+- Rule-based heuristic layer details: upgrade2/README.md
+- Overfitting diagnosis toolkit: models/README.md
+- The separate, later BiLSTM rebuild: enhanced/README.md
+- Research paper (literature review + BERT baseline): docs/Classifying_Toxic_Comments_Using_Deep_Learning.pdf

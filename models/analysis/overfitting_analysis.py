@@ -7,6 +7,12 @@ This script analyzes your machine learning model for signs of overfitting and pr
 actionable recommendations to improve generalization.
 """
 
+import sys as _sys
+if _sys.platform == "win32":
+    _sys.stdout.reconfigure(encoding="utf-8")
+    _sys.stderr.reconfigure(encoding="utf-8")
+
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
