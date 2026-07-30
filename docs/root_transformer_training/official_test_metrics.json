@@ -1,0 +1,16 @@
+{
+  "threshold": 0.9685947895050049,
+  "accuracy": 0.9157679202225765,
+  "auc": 0.9475960656941528,
+  "confusion_matrix": [
+    [
+      53821,
+      4067
+    ],
+    [
+      1322,
+      4768
+    ]
+  ],
+  "classification_report": "              precision    recall  f1-score   support\n\n       clean       0.98      0.93      0.95     57888\n       toxic       0.54      0.78      0.64      6090\n\n    accuracy                           0.92     63978\n   macro avg       0.76      0.86      0.80     63978\nweighted avg       0.93      0.92      0.92     63978\n"
+}

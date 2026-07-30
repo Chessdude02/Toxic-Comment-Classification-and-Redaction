@@ -37,6 +37,11 @@ import os
 from typing import Dict, List, Tuple, Union, Optional
 import tensorflow as tf
 from tensorflow.keras.preprocessing import sequence
+# Registers the root Transformer's custom layers (TransformerBlock,
+# AttentionPooling, PositionalEmbedding) with Keras's serialization registry
+# as an import side effect, so load_model() below can resolve them by name
+# without every caller needing to pass custom_objects explicitly.
+import transformer_layers  # noqa: F401
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -550,9 +555,12 @@ def load_pretrained_model(model_path: str = None, config_path: str = None, token
         ToxicityRedactor instance or None if loading fails
     """
     try:
-        # Set default paths
+        # Set default paths. Native .keras format (not legacy HDF5) because
+        # the root Transformer uses custom Layer subclasses - HDF5's
+        # round-tripping of those is far less reliable than the native
+        # format's, which stores each layer's get_config() output directly.
         if model_path is None:
-            model_path = 'saved_models/demo_toxicity_classifier.h5'
+            model_path = 'saved_models/demo_toxicity_classifier.keras'
         if config_path is None:
             config_path = 'saved_models/config.pickle'
         if tokenizer_path is None:

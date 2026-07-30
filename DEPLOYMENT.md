@@ -2,10 +2,11 @@
 
 This deploys `src/toxicity_web_app.py` (the Flask redaction web app + REST API) behind gunicorn.
 
-**As of this commit, a trained model ships in the repo** at `src/saved_models/` (the `enhanced/`
-BiLSTM, re-saved to the path the root app looks for — see the root README's note on this), so a
-fresh deploy runs in `mode: "trained"` immediately, no training step needed. If those files are
-ever removed, the app still works: it falls back to the rule-based heuristic detector
+**As of this commit, a trained model ships in the repo** at `src/saved_models/` — the root
+notebook's own Transformer architecture, actually trained on real Jigsaw data with a documented
+GloVe 6B 100D substitute (see `docs/root_transformer_training/README.md` for exactly how and why),
+so a fresh deploy runs in `mode: "trained"` immediately, no training step needed. If those files
+are ever removed, the app still works: it falls back to the rule-based heuristic detector
 (`src/heuristic_fallback.py`) instead of failing outright.
 
 **The tradeoff, confirmed by directly measuring it, not estimated:**
@@ -31,7 +32,7 @@ free URL:
 1. **Pay for enough RAM and keep the shipped model.** Render's cheapest paid instance (Starter,
    512MB→a bit more headroom isn't quite enough either in practice — you'd want at least their
    next tier up, or equivalently ~1GB+ RAM elsewhere) comfortably fits ~718MB RSS. This is the only
-   option that gets you the real 90.86%/0.938 AUC model live on a public URL.
+   option that gets you the real 91.58%/0.9476 AUC Transformer model live on a public URL.
 2. **Deploy on the free tier without the shipped model**, accepting heuristic-only predictions.
    Before deploying, delete or rename `src/saved_models/` and `src/tokenizer.pickle` (or deploy
    from a branch that doesn't have them) — with those gone, `_trained_model_files_present()`
@@ -102,7 +103,7 @@ e.g. after actually training the root Transformer notebook (needs the real Jigsa
 embeddings, neither checked into the repo, see `.gitignore`) — put these three files at the paths
 `src/toxicity_redactor.py`'s `load_pretrained_model()` looks for by default:
 
-- `src/saved_models/demo_toxicity_classifier.h5` (or `.keras`)
+- `src/saved_models/demo_toxicity_classifier.keras`
 - `src/saved_models/config.pickle` (needs at least `label_columns`, `threshold`, `max_len`)
 - `src/tokenizer.pickle` (note: NOT under `saved_models/` — that's `load_pretrained_model()`'s
   existing default, not a typo)
