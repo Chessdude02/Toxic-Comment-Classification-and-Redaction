@@ -222,7 +222,11 @@ python toxicity_web_app.py
 # Open http://localhost:5000
 ```
 
-Without a trained model in `saved_models/`, the app automatically falls back to a rule-based heuristic detector (`src/heuristic_fallback.py`, wrapping `upgrade2`'s keyword/pattern analyzer) instead of returning HTTP 503 — real, working predictions with no training required, clearly labeled as heuristic rather than a trained model. The running app shows a banner (and each API response includes a `mode` field: `trained` / `heuristic` / `unavailable`) so it's always clear which one is actually answering. Train via step 4 for the trained-model results described above.
+Without a trained model in `saved_models/`, the app automatically falls back to a rule-based heuristic detector (`src/heuristic_fallback.py`, wrapping `upgrade2`'s keyword/pattern analyzer) instead of returning HTTP 503 — real, working predictions with no training required, clearly labeled as heuristic rather than a trained model. The running app shows a banner (and each API response includes a `mode` field: `trained` / `heuristic` / `unavailable`) so it's always clear which one is actually answering.
+
+**This repo ships a trained model at `src/saved_models/` by default** so the app runs in `trained` mode out of the box — but it's the **`enhanced/` BiLSTM** (90.86% accuracy / 0.938 AUC, see `enhanced/README.md`), not the root Transformer notebook's own model. `ToxicityRedactor` accepts either architecture (it only needs a model, tokenizer, and a `label_columns` list), so this is the BiLSTM's weights placed where the root app looks for a trained model, not a claim that the Transformer notebook itself was retrained. If you train the actual Transformer via step 4, its weights would take over the same slot with the numbers reported earlier in this README (89.49% accuracy / 0.9785 AUC).
+
+**Memory note**: loading a real model (either architecture) pulls in TensorFlow, which pushes RSS to ~718MB in gunicorn — confirmed by directly measuring it, not estimated. That's over the budget on 512MB free-tier hosts (Render, Railway, etc.); see `DEPLOYMENT.md` for what this means for cloud deployment.
 
 ### 6. (Alternative) Run the Web Application with Docker
 

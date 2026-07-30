@@ -20,6 +20,14 @@ logs/
 !enhanced/saved_models/toxicity_model.keras
 !enhanced/saved_models/tokenizer.pickle
 !enhanced/saved_models/config.pickle
+# Same model, re-saved in HDF5 format and copied to where
+# src/toxicity_redactor.py's load_pretrained_model() looks by default, so
+# the root Flask app runs in 'trained' mode out of the box. See its own
+# README note on memory: this pushes the deployed app's RSS to ~718MB,
+# over a 512MB free-tier host's budget - verified locally, not theoretical.
+!src/saved_models/demo_toxicity_classifier.h5
+!src/saved_models/config.pickle
+!src/tokenizer.pickle
 .env
 .ipynb_checkpoints/
 venv/
