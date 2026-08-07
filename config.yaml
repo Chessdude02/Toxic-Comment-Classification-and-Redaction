@@ -1,0 +1,146 @@
+# ============================================================
+# Toxic Comment Classification & Redaction System
+# Hyperparameter Configuration
+# ============================================================
+
+data:
+  dataset: "jigsaw-toxic-comment-classification-challenge"
+  dataset_path: "train.csv"
+  max_sequence_length: 128
+  vocab_size: 50000
+  val_split: 0.15
+  test_split: 0.10
+  random_seed: 42
+  dedup: true
+
+embeddings:
+  type: "glove"
+  path: "glove.840B.300d.txt"
+  dim: 300
+  vocab_coverage_target: 0.80  # achieved: 83.8%
+
+model:
+  architecture: "transformer"
+  embedding_dim: 300
+  trainable_embeddings: true
+  use_cls_token: true
+  pooling_strategy: "cls_token"
+
+  transformer:
+    num_blocks: 3
+    num_heads: 6
+    ff_dim: 1024
+    activation: "gelu"
+    pre_norm: true
+    attention_dropout: 0.1
+
+  classifier:
+    dense_units: [128, 64]
+    activation: "gelu"
+    use_layer_norm: true
+    dropout_rate: 0.2
+    l2_regularization: 0.00001
+
+  output:
+    units: 1
+    activation: "sigmoid"
+
+  total_parameters: 18021377
+
+training:
+  epochs: 150
+  batch_size: 64
+
+  optimizer:
+    type: "adamw"
+    learning_rate: 0.0001
+    weight_decay: 0.01
+    clipnorm: 1.0
+
+  lr_schedule:
+    type: "warmup_cosine_decay"
+    warmup_steps: 1000
+
+  loss:
+    type: "binary_crossentropy"
+    label_smoothing: 0.1
+
+  class_weights:
+    enabled: true
+    non_toxic: 0.553
+    toxic: 5.227
+
+  callbacks:
+    early_stopping:
+      enabled: true
+      monitor: "val_auc"
+      patience: 15
+      min_delta: 0.0001
+      restore_best_weights: true
+
+    reduce_lr:
+      enabled: true
+      monitor: "val_loss"
+      patience: 7
+      factor: 0.5
+      min_lr: 0.00001
+
+    model_checkpoint:
+      enabled: true
+      monitor: "val_auc"
+      save_best_only: true
+
+    tensorboard:
+      enabled: true
+      log_dir: "logs/"
+
+diagnostics:
+  enabled: true
+  check_interval: 5
+  overfitting_threshold: 0.05
+  underfitting_threshold: 0.70
+
+results:
+  best_epoch: 3
+  total_epochs_run: 18
+  test_accuracy: 0.8949
+  test_auc: 0.9785
+  test_loss: 0.2195
+  confusion_matrix:
+    TN: 17977
+    FP: 2240
+    FN: 110
+    TP: 2028
+
+redaction:
+  default_level: "moderate"
+  default_style: "asterisks"
+  toxicity_threshold: 0.5
+
+  levels:
+    minimal:
+      threshold: 0.3
+      description: "Light censoring, preserves readability"
+    moderate:
+      threshold: 0.5
+      description: "Standard redaction (default)"
+    aggressive:
+      threshold: 0.7
+      description: "Heavy redaction for strict environments"
+    complete:
+      threshold: 0.9
+      description: "Full removal or replacement"
+
+  styles:
+    - asterisks    # f***ing
+    - blocks       # ████████
+    - brackets     # [REDACTED]
+    - euphemisms   # frick, darn
+    - partial      # f**k
+    - dashes       # --------
+
+api:
+  host: "0.0.0.0"
+  port: 5000
+  debug: false
+  cors_enabled: true

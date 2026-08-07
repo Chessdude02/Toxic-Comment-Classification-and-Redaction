@@ -1,0 +1,21 @@
+id,comment_text,toxic,severe_toxic,obscene,threat,insult,identity_hate
+1,"This is a great article, thanks for sharing!",0,0,0,0,0,0
+2,I completely disagree with this viewpoint.,0,0,0,0,0,0
+3,You're absolutely stupid if you believe this nonsense.,1,0,0,0,1,0
+4,Thanks for the detailed explanation.,0,0,0,0,0,0
+5,"This is helpful information, much appreciated.",0,0,0,0,0,0
+6,"What a load of garbage, this writer is an idiot.",1,0,1,0,1,0
+7,I found this very informative and well-written.,0,0,0,0,0,0
+8,Complete waste of time reading this trash.,1,0,1,0,0,0
+9,Excellent points made throughout the article.,0,0,0,0,0,0
+10,The author is clearly biased and ignorant.,1,0,0,0,1,0
+11,Great job on researching this topic thoroughly.,0,0,0,0,0,0
+12,This is the dumbest thing I've ever read.,1,1,0,0,1,0
+13,I appreciate the different perspective offered here.,0,0,0,0,0,0
+14,Whoever wrote this should be ashamed.,1,0,0,0,0,0
+15,Well-structured argument with solid evidence.,0,0,0,0,0,0
+16,"This makes me so angry, what terrible content.",1,0,0,0,0,0
+17,Thank you for taking the time to explain this.,0,0,0,0,0,0
+18,I hate this kind of misleading information.,1,0,0,0,0,0
+19,Very educational and easy to understand.,0,0,0,0,0,0
+20,The comments section is full of morons.,1,0,0,0,1,0
