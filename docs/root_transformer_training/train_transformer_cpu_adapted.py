@@ -98,14 +98,18 @@ CONFIG = {
         "pooling_strategy": "cls_token",
     },
     "training": {
-        "epochs": 30,
+        "epochs": 50,
         "batch_size": 128,
         "learning_rate": 0.0001,
         "optimizer": "adamw",
         "warmup_steps": 300,
         "loss": "binary_crossentropy",
         "class_weights": True,
-        "early_stopping": {"enabled": True, "patience": 6, "min_delta": 0.0001},
+        # Patience raised from 6 (30-epoch run) to 12 so early stopping doesn't
+        # cut the run short before all 50 epochs get a chance to run - we want
+        # to actually see the overfitting point on the curve, not just the
+        # point where the previous, tighter patience gave up.
+        "early_stopping": {"enabled": True, "patience": 12, "min_delta": 0.0001},
         "reduce_lr": {"enabled": True, "patience": 7, "factor": 0.5, "min_lr": 0.00001},
         "checkpoint_freq": 5,
     },
@@ -547,6 +551,9 @@ def main():
         checkpoint_path, monitor="val_auc", mode="max", save_best_only=True, verbose=1,
     ))
 
+    history_csv_path = str(ARTIFACTS_DIR / "training_history.csv")
+    callbacks.append(keras.callbacks.CSVLogger(history_csv_path))
+
     print(f"Training for up to {CONFIG['training']['epochs']} epochs")
     print(f"Batch size: {CONFIG['training']['batch_size']}")
 
@@ -559,6 +566,12 @@ def main():
         callbacks=callbacks,
         verbose=2,
     )
+
+    with open(ARTIFACTS_DIR / "history.json", "w") as f:
+        json.dump({k: [float(v) for v in vals] for k, vals in history.history.items()}, f, indent=2)
+    print(f"\nActually trained {len(history.history['loss'])} epochs "
+          f"(cap was {CONFIG['training']['epochs']}, early-stop patience "
+          f"{CONFIG['training']['early_stopping']['patience']})")
 
     print("=" * 80)
     print("FINAL EVALUATION ON HELD-OUT TEST SPLIT (from the 30K sample)")

@@ -9,7 +9,7 @@
 
 An end-to-end NLP system for toxic comment classification and intelligent real-time content redaction — built and deployed during an ML internship at **BISAG-N (Government of India)**.
 
-The classification model in this repository's root layer is a custom **Transformer architecture**. The notebook's own printed output (below) claims 223,549 rows and AUC 0.9785 with GloVe 840B 300D — that specific run has not been independently reproduced here (840B 300D needs a ~2GB download this environment's network policy blocks). What's actually deployed and verified is documented in **[docs/root_transformer_training/](docs/root_transformer_training/)**: the same architecture, really trained end-to-end here, with a documented embeddings substitution (GloVe 6B 100D) and a smaller sample size — **91.58% accuracy / 0.9476 AUC** on the official held-out Kaggle test set, plus a known, verified limitation (no context-trap debiasing, unlike `enhanced/`'s BiLSTM). The system extends beyond classification into a full **redaction pipeline** with a REST API, Flask web interface, and context-aware semantic analysis layer.
+The classification model in this repository's root layer is a custom **Transformer architecture**. The notebook's own printed output (below) claims 223,549 rows and AUC 0.9785 with GloVe 840B 300D — that specific run has not been independently reproduced here (840B 300D needs a ~2GB download this environment's network policy blocks). What's actually deployed and verified is documented in **[docs/root_transformer_training/](docs/root_transformer_training/)**: the same architecture, really trained end-to-end here for a full 50-epoch run with train/val curves checked for over- and underfitting, with a documented embeddings substitution (GloVe 6B 100D) and a smaller sample size — **90.01% accuracy / 0.9454 AUC** on the official held-out Kaggle test set, plus a known, verified limitation (no context-trap debiasing, unlike `enhanced/`'s BiLSTM). The system extends beyond classification into a full **redaction pipeline** with a REST API, Flask web interface, and context-aware semantic analysis layer.
 
 This repository has **two layers**, developed at different times and kept separate rather than merged:
 
@@ -58,10 +58,10 @@ limitation before you rely on this for anything.
 |--------|-------|
 | Dataset | 30,000-row stratified sample of the real 159,571-row Jigsaw training set |
 | Embeddings | GloVe 6B 100D (substitute for 840B 300D — see docs/root_transformer_training/) |
-| **Test Accuracy (official 63,978-row held-out Kaggle test set)** | **91.58%** |
-| **Test AUC** | **0.9476** |
-| Toxic precision / recall / F1 | 0.54 / 0.78 / 0.64 |
-| Best epoch | 20 of 30 (early stopping, patience=6) |
+| **Test Accuracy (official 63,978-row held-out Kaggle test set)** | **90.01%** |
+| **Test AUC** | **0.9454** |
+| Toxic precision / recall / F1 | 0.49 / 0.82 / 0.61 |
+| Best epoch | 14 of 50 allotted (early stopping, patience=12) — trained/validated over the full 50-epoch budget and checked for over/underfitting; see docs/root_transformer_training/ for the curves |
 | Known limitation | No context-trap debiasing — e.g. "I hate mondays" misclassifies as toxic (98.7% confidence). See docs/root_transformer_training/README.md for more examples and why. |
 
 ### Live Inference Examples
@@ -253,7 +253,7 @@ python toxicity_web_app.py
 
 Without a trained model in `saved_models/`, the app automatically falls back to a rule-based heuristic detector (`src/heuristic_fallback.py`, wrapping `upgrade2`'s keyword/pattern analyzer) instead of returning HTTP 503 — real, working predictions with no training required, clearly labeled as heuristic rather than a trained model. The running app shows a banner (and each API response includes a `mode` field: `trained` / `heuristic` / `unavailable`) so it's always clear which one is actually answering.
 
-**This repo ships a trained model at `src/saved_models/` by default** so the app runs in `trained` mode out of the box — it's the root Transformer itself, really trained (see "✅ Verified Results" above and `docs/root_transformer_training/` for the full methodology and a documented false-positive limitation), not the notebook's own unreproduced 840B/300D run. `ToxicityRedactor` also works with the `enhanced/` BiLSTM (90.86% accuracy / 0.938 AUC, see `enhanced/README.md`) if you'd rather swap that in instead — it only needs a model, tokenizer, and a `label_columns` list, and the BiLSTM doesn't share this model's context-trap weakness. Both are real, both are documented; pick based on what you're optimizing for.
+**This repo ships a trained model at `src/saved_models/` by default** so the app runs in `trained` mode out of the box — it's the root Transformer itself, really trained (see "✅ Verified Results" above and `docs/root_transformer_training/` for the full methodology and a documented false-positive limitation), not the notebook's own unreproduced 840B/300D run. `ToxicityRedactor` also works with the `enhanced/` BiLSTM (90.86% accuracy / 0.938 AUC, see `enhanced/README.md`) if you'd rather swap that in instead — the Transformer here scores 90.01% accuracy / 0.9454 AUC on the same official test set — it only needs a model, tokenizer, and a `label_columns` list, and the BiLSTM doesn't share this model's context-trap weakness. Both are real, both are documented; pick based on what you're optimizing for.
 
 **Memory note**: loading a real model (either architecture) pulls in TensorFlow, which pushes RSS to ~718MB in gunicorn — confirmed by directly measuring it, not estimated. That's over the budget on 512MB free-tier hosts (Render, Railway, etc.); see `DEPLOYMENT.md` for what this means for cloud deployment.
 

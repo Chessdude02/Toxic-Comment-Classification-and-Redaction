@@ -1,16 +1,16 @@
 {
-  "threshold": 0.9685947895050049,
-  "accuracy": 0.9157679202225765,
-  "auc": 0.9475960656941528,
+  "threshold": 0.9100000000000003,
+  "accuracy": 0.9000593954171746,
+  "auc": 0.9453953747727337,
   "confusion_matrix": [
     [
-      53821,
-      4067
+      52577,
+      5311
     ],
     [
-      1322,
-      4768
+      1083,
+      5007
     ]
   ],
-  "classification_report": "              precision    recall  f1-score   support\n\n       clean       0.98      0.93      0.95     57888\n       toxic       0.54      0.78      0.64      6090\n\n    accuracy                           0.92     63978\n   macro avg       0.76      0.86      0.80     63978\nweighted avg       0.93      0.92      0.92     63978\n"
+  "classification_report": "              precision    recall  f1-score   support\n\n       clean       0.98      0.91      0.94     57888\n       toxic       0.49      0.82      0.61      6090\n\n    accuracy                           0.90     63978\n   macro avg       0.73      0.87      0.78     63978\nweighted avg       0.93      0.90      0.91     63978\n"
 }

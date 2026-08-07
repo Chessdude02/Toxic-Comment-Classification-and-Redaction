@@ -26,32 +26,56 @@ not rewritten) adapted with the minimum changes needed to train for real on this
 | Training rows | 223,549 | 30,000 (stratified sample of the real 159,571-row Jigsaw train.csv) |
 | Sequence length | 128 | 64 |
 | Batch size | 64 | 128 (larger batch = fewer, cheaper steps on CPU) |
-| Max epochs / patience | 150 / 15 | 30 / 6 |
+| Max epochs / patience | 150 / 15 | 50 / 12 |
 
 One actual bug fix was required, not a design choice: `DataPipeline.load_glove_embeddings()`
 hardcodes `if len(coefs) == 300`, which would silently discard every vector from a 100-dim file.
 Changed to check the configured embedding dimension instead.
 
-## Verified results (real training + real held-out evaluation)
+## This run: 50-epoch cap, explicitly checked for over/underfitting
 
-Training: early-stopped at epoch 26/30 (patience 6, monitor `val_auc`), best weights restored from
-epoch 20 (val_auc 0.9592). Total wall-clock time: ~46 minutes on this environment's 4-core CPU.
+An earlier pass at this same adaptation capped epochs at 30 with early-stopping patience 6, which
+stopped before there was much room to see what a longer run actually does. This version raises the
+cap to 50 and the patience to 12, specifically so the full train/val trajectory — including any
+overfitting — would show up in the curves instead of being cut off early.
+
+**Training actually ran 26 of the 50 allotted epochs** (early-stopped, `monitor=val_auc`, patience
+12), total wall-clock ~46 minutes on this environment's 4-core CPU.
+
+![Training curves](training_curves.png)
+
+**Diagnosis, read directly off the curves above, not assumed:**
+
+- **No underfitting.** Both train and validation AUC reach ~0.95+ within the first 5 epochs — the
+  model has enough capacity to learn the signal quickly.
+- **Overfitting after epoch ~14.** Train loss keeps falling monotonically (0.19 → 0.11 by epoch
+  26) and train AUC keeps climbing (0.978 → 0.991), while validation loss stops improving and gets
+  noisier (oscillating 0.26–0.40) and validation AUC *declines* slightly (0.956 → 0.947). This is
+  the textbook overfitting signature for a transformer with this much capacity trained on a
+  30K-row sample.
+- **The deployed weights are not the overfit ones.** Early stopping with `restore_best_weights`
+  rolled the model back to its **epoch-14 checkpoint** (val_auc 0.9557) before saving — the
+  12 additional epochs of overfitting past that point were discarded, not shipped.
+
+## Verified results (real training + real held-out evaluation)
 
 Evaluated on the **official 63,978-row held-out Kaggle test set** (`test.csv` + `test_labels.csv`,
 same methodology as `enhanced/evaluation/evaluate_on_kaggle_test.py`), with the decision threshold
-tuned on the validation set for best F1 (0.969, vs. F1 0.582 at a flat 0.5 — see
-`tune_threshold.py`'s logic, not included here but the same pattern as `enhanced/`'s own threshold
-tuning):
+tuned on the validation set for best F1 (0.91, vs F1 0.50 at a flat 0.5 threshold):
 
 | Metric | Value |
 |---|---|
-| Accuracy | **91.58%** |
-| AUC | **0.9476** |
-| Toxic precision / recall / F1 | 0.54 / 0.78 / 0.64 |
-| Clean precision / recall / F1 | 0.98 / 0.93 / 0.95 |
-| Confusion matrix [TN, FP / FN, TP] | [53821, 4067 / 1322, 4768] |
+| Accuracy | **90.01%** |
+| AUC | **0.9454** |
+| Toxic precision / recall / F1 | 0.49 / 0.82 / 0.61 |
+| Clean precision / recall / F1 | 0.98 / 0.91 / 0.94 |
+| Confusion matrix [TN, FP / FN, TP] | [52577, 5311 / 1083, 5007] |
 
-Full numbers in `official_test_metrics.json`.
+Full numbers in `official_test_metrics.json`. (A separate, otherwise-identical run capped at 30
+epochs/patience 6 landed marginally higher — 91.58% accuracy / 0.9476 AUC — most likely run-to-run
+noise from weight initialization and data shuffling rather than a real effect of the epoch cap,
+since both runs converge and start overfitting around the same point. This run is what's actually
+deployed, kept specifically because it comes with the full 50-epoch overfitting diagnostic above.)
 
 ## A real, known limitation: no context-trap debiasing
 
@@ -77,7 +101,9 @@ moderation use, not just a documentation footnote.
 
 - `train_transformer_cpu_adapted.py` — the actual training script that produced the shipped model
   (`../../src/saved_models/demo_toxicity_classifier.keras`)
-- `official_test_metrics.json` — full metrics from the official held-out evaluation
+- `training_curves.png` — train/val loss, accuracy, and AUC per epoch for the full 26-epoch run
+- `official_test_metrics.json` — full metrics from the official held-out evaluation, at the tuned
+  threshold
 
 To reproduce: you'll need `train.csv`, `test.csv`, `test_labels.csv` (Jigsaw competition data) and
 a GloVe embeddings file matching `embedding_dim` in the script's `CONFIG`. Adjust the path

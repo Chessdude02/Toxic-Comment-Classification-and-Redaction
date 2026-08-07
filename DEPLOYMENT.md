@@ -32,7 +32,7 @@ free URL:
 1. **Pay for enough RAM and keep the shipped model.** Render's cheapest paid instance (Starter,
    512MB→a bit more headroom isn't quite enough either in practice — you'd want at least their
    next tier up, or equivalently ~1GB+ RAM elsewhere) comfortably fits ~718MB RSS. This is the only
-   option that gets you the real 91.58%/0.9476 AUC Transformer model live on a public URL.
+   option that gets you the real 90.01%/0.9454 AUC Transformer model live on a public URL.
 2. **Deploy on the free tier without the shipped model**, accepting heuristic-only predictions.
    Before deploying, delete or rename `src/saved_models/` and `src/tokenizer.pickle` (or deploy
    from a branch that doesn't have them) — with those gone, `_trained_model_files_present()`
