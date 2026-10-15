@@ -1,4 +1,17 @@
 #!/usr/bin/env python3
+# ============================================================================
+# HISTORICAL / REFERENCE CODE - NOT RUNNABLE AS-IS
+# ============================================================================
+# Preserved to document how severe overfitting in an early RNN-based model
+# was diagnosed and fixed (see ../README.md for the full writeup).
+# It references file paths and artifact formats from that original
+# diagnosis session and will not run correctly out of the box in this
+# repository as it stands today.
+#
+# For a working, tested classifier + redaction pipeline, use enhanced/
+# instead (enhanced/training, enhanced/inference, enhanced/redaction).
+# ============================================================================
+
 """
 Use Fixed Toxicity Model
 ========================

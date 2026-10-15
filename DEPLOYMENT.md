@@ -94,6 +94,16 @@ docker run -p 5000:5000 -e PORT=5000 toxic-comment-redaction
 # Open http://localhost:5000
 ```
 
+**If you raise `WEB_CONCURRENCY` above 1** (e.g. on a host with enough RAM for multiple full
+TensorFlow+model copies), know what you're trading away: the chat log and moderation stats
+(`/api/chat-log`, `/api/stats`) are plain in-process Python state, not backed by Redis or any
+shared store. With more than one gunicorn worker, each one only sees the requests it personally
+handled, so those two endpoints stop reflecting a single consistent view — a refresh can show
+different numbers depending on which worker answers it. The app logs a warning at startup when
+`WEB_CONCURRENCY > 1` so this isn't silent, but there's no code fix for it short of adding shared
+storage. The default `--workers 1` sidesteps this entirely (and is also required to avoid an OOM
+from duplicating the model in memory — see above), so this only matters if you deliberately raise it.
+
 ---
 
 ## Swapping in a different trained model

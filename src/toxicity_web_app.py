@@ -764,6 +764,24 @@ def initialize_models():
 # than executing it as a script.
 _models_ready = initialize_models()
 
+# chat_moderator's message history and stats (see /api/stats, /api/chat-log)
+# are plain in-process Python state, not a shared store like Redis. The
+# Dockerfile/Procfile default to --workers 1 (chiefly to avoid loading a
+# second full copy of the model into memory), which incidentally also keeps
+# this consistent - but raising WEB_CONCURRENCY for more throughput on a
+# bigger box would silently split chat history/stats across worker
+# processes, with each worker only seeing requests gunicorn routed to it.
+# There's no code fix for that without adding shared storage, so at least
+# make it loud instead of silent.
+_web_concurrency = int(os.environ.get('WEB_CONCURRENCY', '1') or '1')
+if _web_concurrency > 1:
+    logger.warning(
+        f"WEB_CONCURRENCY={_web_concurrency}: chat history and stats are "
+        "in-process state, not shared across workers. With more than one "
+        "worker, /api/chat-log and /api/stats will reflect only whichever "
+        "worker handled each request, not a consistent global view."
+    )
+
 
 @app.route('/')
 def index():

@@ -6,9 +6,18 @@ Redaction System REST API
 A Flask-based REST API for the intelligent redaction system:
 - RESTful endpoints for message filtering
 - Batch processing capabilities
-- Configuration management
-- Real-time WebSocket support
-- API key authentication
+- Configuration management (requires the optional real_time_message_filter module)
+
+Not implemented despite earlier claims in this docstring: there is no
+WebSocket support anywhere in this file (it's a plain HTTP REST API), and no
+API key or other authentication on any endpoint. Don't rely on either
+without adding it first.
+
+This file is not part of the deployed app - Procfile/Dockerfile both run
+src/toxicity_web_app.py. Kept here as a separate, optional REST API you can
+run standalone (`python redaction_api.py`) if you want the extra
+/api/filter, /api/filter/batch, /api/detect, /api/config endpoints it adds
+on top of toxicity_web_app.py.
 """
 
 import sys as _sys
@@ -24,10 +33,11 @@ import threading
 import time
 import uuid
 from datetime import datetime
+import os
 from intelligent_redaction_system import IntelligentRedactor, MessageModerator
 # real_time_message_filter provides RealTimeMessageFilter/FilterConfig/MessageEvent for the
-# /api/moderate endpoint. It's an optional module — imported lazily below so the rest of the
-# API (filter/detect/stats/etc.) still works if it isn't present.
+# /api/moderate endpoint. It's an optional module, not shipped in this repo - imported in its
+# own try/except below so a missing module disables only /api/moderate, not every endpoint.
 
 app = Flask(__name__)
 CORS(app)
@@ -42,16 +52,27 @@ api_stats = {
 }
 
 def initialize_redaction_system():
-    """Initialize the redaction system components"""
+    """Initialize the redaction system components.
+
+    Returns True as long as the core redactor initializes - the optional
+    real-time filter (and /api/moderate, which depends on it) is allowed to
+    be unavailable without taking down the rest of the API. Previously both
+    were initialized in one try/except, so a missing real_time_message_filter
+    module (which isn't shipped in this repo) made this function return
+    False unconditionally, which made run_api_server() refuse to even start
+    the Flask server - despite the core redactor having initialized fine.
+    """
     global redactor, message_filter
-    
+
     try:
         print("🔄 Initializing redaction system for API...")
-
-        # Initialize redactor
         redactor = IntelligentRedactor()
+        print("✅ Redactor initialized for API")
+    except Exception as e:
+        print(f"❌ Failed to initialize redactor: {e}")
+        return False
 
-        # Initialize real-time filter (optional — module may not be present)
+    try:
         from real_time_message_filter import RealTimeMessageFilter, FilterConfig
         config = FilterConfig(
             toxicity_threshold=0.4,
@@ -60,13 +81,13 @@ def initialize_redaction_system():
         )
         message_filter = RealTimeMessageFilter(config)
         message_filter.initialize_ai_components()
-        
-        print("✅ Redaction system initialized for API")
-        return True
-        
+        print("✅ Real-time message filter initialized")
     except Exception as e:
-        print(f"❌ Failed to initialize redaction system: {e}")
-        return False
+        print(f"⚠️  Real-time message filter unavailable ({e}) - /api/moderate "
+              f"and /api/config will return 503")
+        message_filter = None
+
+    return True
 
 # API Endpoints
 
@@ -694,8 +715,12 @@ def main():
     choice = input("\nEnter choice (1-3): ").strip()
     
     if choice == '1':
-        # Start the server
-        run_api_server(host='localhost', port=5000, debug=True)
+        # Start the server. debug=True would expose Werkzeug's interactive
+        # debugger (arbitrary code execution) to anyone who can reach this
+        # port - opt in explicitly via FLASK_DEBUG, same convention as
+        # toxicity_web_app.py, rather than hardcoding it on.
+        debug = os.environ.get('FLASK_DEBUG', '').lower() in ('1', 'true')
+        run_api_server(host='localhost', port=5000, debug=debug)
         
     elif choice == '2':
         # Test the API
