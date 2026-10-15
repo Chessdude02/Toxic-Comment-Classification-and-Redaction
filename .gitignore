@@ -1,16 +1,37 @@
 __pycache__/
 *.pyc
+*.pyo
+*.h5
+*.keras
+*.pkl
+*.pickle
+*.zip
+glove.840B.300d.txt
+train.csv
+test.csv
+logs/
+**/saved_models/*
+!**/saved_models/*.png
+!**/saved_models/.gitkeep
+# Real, trained-and-evaluated enhanced/ BiLSTM artifacts (~29MB total) -
+# shipped deliberately so enhanced/inference and enhanced/redaction work
+# without a separate training step.
+!enhanced/saved_models/toxicity_model.keras
+!enhanced/saved_models/tokenizer.pickle
+!enhanced/saved_models/config.pickle
+# Root Transformer - also real and trained-and-evaluated (glove.6B.100d
+# substitute, see docs/root_transformer_training/README.md for exactly how
+# and why), placed where src/toxicity_redactor.py's load_pretrained_model()
+# looks by default so the root Flask app runs in 'trained' mode out of the
+# box. See DEPLOYMENT.md: loading either model pushes the deployed app's
+# RSS to ~700MB+, over a 512MB free-tier host's budget - verified locally,
+# not theoretical.
+!src/saved_models/demo_toxicity_classifier.keras
+!src/saved_models/config.pickle
+!src/tokenizer.pickle
+.env
+.ipynb_checkpoints/
 venv/
 .venv/
-
-# Trained model artifacts (regenerate with models/training/fix_overfitted_model.py)
-models/saved_models/*.keras
-models/saved_models/*.h5
-models/saved_models/*.pickle
-
-# Raw Kaggle competition data - redistribution isn't permitted by the
-# competition rules, so it's never checked in. Place train.csv here
-# (or point JIGSAW_TRAIN_CSV at it) to train on real data locally.
-models/data/
-*.csv
-!models/**/*.example.csv
+*.egg-info/
+.DS_Store

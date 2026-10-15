@@ -1,0 +1,30 @@
+# Render Blueprint for the Flask redaction web app.
+#
+# Usage: on render.com, "New +" -> "Blueprint" -> connect this repo/branch ->
+# Render reads this file and creates the service below automatically.
+#
+# IMPORTANT - read before deploying on `plan: free` (512MB RAM):
+# A real trained model ships in this repo at src/saved_models/ (see the
+# root README and DEPLOYMENT.md). Loading it pulls in TensorFlow, which
+# alone costs ~600MB RSS - confirmed by directly measuring it at ~718MB
+# total, not estimated. That does NOT fit the free plan's 512MB and WILL
+# get OOM-killed (this repo hit exactly that failure once already before
+# the model was present, from an unrelated cause since fixed - this one is
+# a hard memory floor, not a bug). Two real options, see DEPLOYMENT.md for
+# detail:
+#   1. Change `plan: free` below to a paid plan with >=1GB RAM.
+#   2. Deploy from a branch/commit with src/saved_models/ and
+#      src/tokenizer.pickle removed - the app then runs on the rule-based
+#      heuristic fallback instead (no TensorFlow import, ~73MB RSS, fits
+#      the free plan comfortably).
+services:
+  - type: web
+    name: toxic-comment-redaction
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"

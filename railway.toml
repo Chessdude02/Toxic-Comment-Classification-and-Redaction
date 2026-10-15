@@ -1,0 +1,21 @@
+# Railway config for the Flask redaction web app.
+#
+# Railway auto-detects the root Dockerfile with no config needed, but this
+# pins the build explicitly and adds a health check. Usage: on railway.app,
+# "New Project" -> "Deploy from GitHub repo" -> select this repo/branch ->
+# Railway reads this file and the Dockerfile automatically. Railway injects
+# $PORT itself; the Dockerfile's CMD already binds to it.
+#
+# Same caveat as render.yaml: no trained model is checked in, so the app
+# runs on the heuristic fallback until you train one and provide it to the
+# container (e.g. a Railway volume mounted at /app/saved_models).
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/api/health"
+healthcheckTimeout = 120
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3

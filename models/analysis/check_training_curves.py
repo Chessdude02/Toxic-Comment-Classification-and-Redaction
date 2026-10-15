@@ -6,6 +6,12 @@ Quick Training Curves Overfitting Check
 Use this script to quickly analyze your model's training history for overfitting.
 """
 
+import sys as _sys
+if _sys.platform == "win32":
+    _sys.stdout.reconfigure(encoding="utf-8")
+    _sys.stderr.reconfigure(encoding="utf-8")
+
+
 import matplotlib.pyplot as plt
 import numpy as np
 
