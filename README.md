@@ -22,6 +22,52 @@ This repository has **two layers**, developed at different times and kept separa
 
 ---
 
+## 🔢 All Numbers at a Glance
+
+This repo involves **four separate experiments**, done at different times by different people with
+different goals. Every number below is tagged with which one it came from and whether it was
+independently verified as part of this repo's restructure (see the linked section for full
+methodology) or is only the source's own unverified, printed claim. Don't mix numbers across rows.
+
+| Source | Status | Accuracy | AUC | Toxic P / R / F1 | Details |
+|---|---|---|---|---|---|
+| **Root Transformer** (this repo, deployed) | ✅ Verified here | 90.01% | 0.9454 | 0.49 / 0.82 / 0.61 | [docs/root_transformer_training/](docs/root_transformer_training/) |
+| **`enhanced/` BiLSTM** (separate rebuild, shipped weights) | ✅ Verified here | 90.86% | 0.9377 | 0.51 / 0.79 / 0.62 | [enhanced/README.md](enhanced/README.md) |
+| Notebook's own run (GloVe 840B 300D) | ⚠️ Unverified — never reproduced | 89.49% | 0.9785 | — / 0.95 / — | "Model Performance" section below |
+| Research paper's own run (BERT) | ⚠️ Unverified — separate, earlier experiment | — | — | — | confusion matrix only, see note above |
+
+Both "✅ Verified here" rows were evaluated on the same **official 63,978-row held-out Kaggle test
+set** (`test.csv` + `test_labels.csv`), at a validation-F1-tuned decision threshold (0.91 for the
+Transformer, 0.838 for the BiLSTM) rather than a flat 0.5, since both are trained on an imbalanced
+~10%-toxic dataset where 0.5 isn't the F1-optimal cutoff.
+
+**Known difference between the two verified models**: the Transformer has no mitigation for
+Jigsaw's documented context-trap bias and misfires on casual, non-toxic uses of common trigger
+words — e.g. "I hate mondays" scores 98.7% toxic. The BiLSTM's training set was deliberately
+augmented with contrastive examples of exactly this pattern (see `enhanced/common/data.py`'s
+`debias_context_traps`), and doesn't share this failure mode.
+
+**Confusion matrices**, for reference:
+
+| Source | TN | FP | FN | TP | Total |
+|---|---|---|---|---|---|
+| Root Transformer (verified) | 52,577 | 5,311 | 1,083 | 5,007 | 63,978 |
+| `enhanced/` BiLSTM (verified) | 53,287 | 4,601 | 1,249 | 4,841 | 63,978 |
+| Notebook's own claim (unverified) | 17,977 | 2,240 | 110 | 2,028 | 22,355 |
+| Research paper's own claim (unverified) | 1,977 | 246 | 272 | 2,106 | 4,601 |
+
+**Engineering numbers**, measured directly rather than estimated:
+
+| Metric | Value |
+|---|---|
+| Flask app RSS, heuristic mode (no trained model loaded) | ~73MB |
+| Flask app RSS, trained mode (model loaded) | ~718MB |
+| Redaction styles shipped | 5 (asterisks, blocks, brackets, euphemisms, partial) |
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for the full memory/hosting tradeoff behind those last two rows.
+
+---
+
 ## 📊 Model Performance (notebook's own printed output — unverified here)
 
 These are the numbers `Industrial_Grade_Toxic_Comment_Classifier.ipynb` itself printed when it was
